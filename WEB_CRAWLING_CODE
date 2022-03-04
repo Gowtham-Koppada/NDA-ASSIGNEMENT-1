@@ -1,0 +1,117 @@
+
+#-------------------------******* NDA ASSIGNMENT 1 *******-------------------------
+
+# The following piece of code is written to crawl through University website "https://ontariotechu" 
+# and get all the possible links from each page connected to one another in an hierarchy !
+
+# Import the following libraries 
+import networkx as nx 
+# Networkx is used for graph functionalities
+import matplotlib.pyplot as plt
+# Used for ploting a graph 
+import requests 
+# For sending HTTP requests
+import re 
+# For implementing the regular expressions
+from community import community_louvain 
+# Used for community detection
+
+#Initiating a new class for crawler.
+class MyCrawler(object): 
+    
+    # For any program always init fuction will be the first one to get executed ! where we declare the values to variable mostly.
+    def __init__(self, URL_To_Crawl):     
+        # First I am creating two empty lists to store the Links related to University and Edges that we visited !
+        self.uoit_Links = []
+        self.node_edge = [] 
+        self.URL_To_Crawl = URL_To_Crawl # URL_To_Crawl variable stores the starting url
+        self.Already_Checked_Links = set() #Already_Checked_Links is a set for storing unique URL data
+        
+    # The following fuction is used to get html page information
+    def get_HTML_Page(self, URL): 
+        try:
+            htmlInfo = requests.get(URL) # Retrives the entire html page w.r.t URL given
+        except Exception as e: # Exception handling 
+            print(e)
+            return "returned with exception"
+        return htmlInfo.content.decode('latin-1') # Returns the decoded data.
+    
+    #get_All_Possible_URL is a function to retrieve University links (we say nodes).
+    def get_All_Possible_URL(self, URL): 
+        uoit_links = []
+        htmlInfo = self.get_HTML_Page(URL) # Calling get_HTML_Page function
+        linkInformation = re.findall('<a\s+(?:[^>]*?\s+)?href="([^"]*)"', htmlInfo) # filtering <href> tags from html page
+        for link in linkInformation: # Retrieving all univeristy associated links
+            splitLink = link.split(".")
+            if "https://ontariotechu" in splitLink:
+                uoit_links.append(link)
+        return set(filter(lambda x: 'mailto' not in x, uoit_links)) #returns unique uoit links as a set.
+    
+    def Crawler(self, URL): #Crawler is used for crawling all the linksin a page. Also called Edges.
+        edge_Dict = [] #edge_Dict is used to store edges associated touoit
+        for link in self.get_All_Possible_URL(URL):
+            edge_Dict.append(link) #Adding all url to edge_Dict
+            if link in self.uoit_Links:
+                continue #ignoring the links already available.
+            self.uoit_Links.append(link) #adding links to uoit_Links
+        for i,link in enumerate(edge_Dict): #printing and mapping thenodes and edges together
+            print(f"{i}.{link}")
+            self.node_edge.append((URL,link)) #mapping the nodes and edges
+            
+    def main(self): #Main function for our program
+        self.Crawler(self.URL_To_Crawl) # calling Crawler function with the URL_To_Crawl
+        for i,link in enumerate(self.uoit_Links): #iterating the uniqueURLS and finding the associated edges/ links
+            print(f"::::::::::No-{i}-->Node: {link}  ")
+            self.Crawler(link)
+            self.Already_Checked_Links.add(link) #adding to Already_Checked_Links, toavoid duplicate links
+        self.Results() #Calling Results functions
+        
+    def Results(self): # This is used for graph calculations
+        G=nx.Graph() #Initilize the graph
+        G.add_edges_from(self.node_edge) # adding nodes and edges to the graph
+        #Below functions are to calculate the graph functionalities
+        print("{} \n Average Degree: {} \n Density: {} \n Weakly Connected Graphs: {} \n Average Clustering: {} \n is_directed: {} \n is_weighted: {} \n Diameter: {} \n Average Path Length: {}\n ".format(nx.info(G),nx.degree(G),nx.density(G),[c for c in (nx.connected_components(G))],nx.average_clustering(G),nx.is_directed(G),nx.is_weighted(G),nx.diameter,nx.average_shortest_path_length(G)))
+        print(":::::::::::::::::::::::::List of Betweenness Centrality:::::::::::::::::::::::::")
+        for betweenness in sorted(nx.betweenness_centrality(G), key=nx.betweenness_centrality(G).get, reverse= True):
+            print("{},{}".format(betweenness,nx.betweenness_centrality(G)[betweenness]))
+        print(":::::::::::::::::::::::::List of Closeness Centrality:::::::::::::::::::::::::")
+        for closeness in sorted(nx.closeness_centrality(G), key=nx.closeness_centrality(G).get, reverse= True):
+            print("{},{}".format(closeness,nx.closeness_centrality(G)[closeness]))
+        print(":::::::::::::::::::::::::List of Degree_centrality:::::::::::::::::::::::::")
+        for degree in sorted(nx.degree_centrality(G), key=nx.degree_centrality(G).get, reverse= True):
+            print("{},{}".format(degree,nx.degree_centrality(G)[degree]))
+        print(":::::::::::::::::::::::::List of Page Rank Centrality:::::::::::::::::::::::::")
+        for pagerank in sorted(nx.pagerank(G), key=nx.pagerank(G).get,reverse= True):
+            print("{},{}".format(pagerank,nx.pagerank(G)[pagerank]))
+        print(":::::::::::::::::::::::::Community detection:::::::::::::::::::::::::")
+        part = community_louvain.best_partition(G)
+        values = [part.get(node) for node in G.nodes()]
+        nx.draw_spring(G, cmap = plt.get_cmap('jet'), node_color = values, node_size=30, with_labels=False)
+        print (len(values))
+        
+        plt.show()
+        plt.savefig("jan.png")
+        
+        degrees = [G.degree(n) for n in G.nodes()]
+        plt.hist(degrees)
+        plt.show()
+        s = sorted(G.degree, key=lambda x: x[1], reverse=True)
+        degrees = sorted([x[0] for x in s])
+        frequency = sorted([x[1] for x in s])
+        plt.loglog(frequency, degrees)
+        plt.xlabel("Degree")
+        plt.ylabel("No. of nodes (Frequency)")
+        plt.title("Degree distribution")
+        plt.show()
+        
+        #function call for visualization of the graph
+        nx.draw(G, with_labels=True)
+        plt.show()
+        #This gives the degree distribution grap
+        degrees = [G.degree(n) for n in G.nodes()]
+        plt.hist(degrees)
+        plt.show()
+
+if __name__ == "__main__":
+    crawler = MyCrawler("https://ontariotechu.ca/")# Calling MyCrawler with param "URL to crawl" 
+    crawler.main()
